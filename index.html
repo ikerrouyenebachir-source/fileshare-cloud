@@ -4,8 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>FileShare — Cloud Platform</title>
+<!-- مكتبات QR -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
+<!-- مكتبة Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bg:#0e1120; --bg2:#151a2e; --card:#1b2140; --card2:#222a4f;
@@ -92,8 +95,8 @@
   #qrBox{background:#fff; padding:14px; border-radius:14px; display:inline-block; min-height:60px; min-width:60px}
   #qrBox img,#qrBox canvas{display:block}
   .code{font-family:monospace; font-size:21px; letter-spacing:2px; margin:18px 0 12px; background:#0d1226; padding:12px; border-radius:12px; border:1px dashed var(--line);}
-  
   #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 10px; }
+  
   @media(max-width:720px){
     .layout{flex-direction:column}
     .sidebar{width:100%; flex-direction:row; overflow-x:auto; border-right:none; border-bottom:1px solid var(--line)}
@@ -104,6 +107,7 @@
 </head>
 <body>
 
+<!-- ============ ÉCRAN DE CONNEXION ============ -->
 <div id="authView" hidden>
   <div class="auth-card">
     <h1>📁 FileShare</h1>
@@ -119,6 +123,7 @@
   </div>
 </div>
 
+<!-- ============ APPLICATION ============ -->
 <div id="appView" hidden>
   <header class="topbar">
     <div class="brand">📁 FileShare Cloud</div>
@@ -174,123 +179,42 @@
 <div id="modalRoot"></div>
 
 <script>
+/* ==================================================================
+   🚨🚨 مكان وضع المفاتيح الخاصة بك 🚨🚨
+   ==================================================================
+   اذهب إلى مشروعك في Supabase، ثم إلى Project Settings -> API
+   وانسخ القيمتين وضعهما بين علامات التنصيص "" أدناه:
+*/
+const SUPABASE_URL = "https://ugfpishtwrwndgbuvnha.supabase.co/rest/v1/";           
+const SUPABASE_ANON_KEY = "sb_publishable_JxsMkEUdCphB4SFFfDJmvw_NKTDbqCm"; 
+/* ================================================================== */
+
+// تهيئة عميل Supabase
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
-/* ==================================================================
-   COUCHE API (Prête pour le Cloud)
-   Remplacez ces fonctions par des appels fetch() vers Supabase/Firebase
-================================================================== */
-const DB = {
-  getUsers: () => JSON.parse(localStorage.getItem('fs_users') || '{}'),
-  saveUsers: (u) => localStorage.setItem('fs_users', JSON.stringify(u)),
-  getFiles: () => JSON.parse(localStorage.getItem('fs_files') || '[]'),
-  saveFiles: (f) => localStorage.setItem('fs_files', JSON.stringify(f)),
-  getCurrentUser: () => localStorage.getItem('fs_currentUser'),
-  setCurrentUser: (u) => u ? localStorage.setItem('fs_currentUser', u) : localStorage.removeItem('fs_currentUser')
-};
-
-let me = null;
-let currentUser = DB.getCurrentUser();
-if (currentUser) me = DB.getUsers()[currentUser];
-
+let me = { id: null, username: '', code: '' };
 const st = { parent: null, crumbs: [{ id: null, name: 'Mes fichiers' }], items: [] };
 let friendState = { id: null, parent: null, crumbs: [] };
 
-async function api(path, { method = 'GET', body = null } = {}) {
-  await new Promise(r => setTimeout(r, 100)); // Simulation réseau
-  const activeUser = DB.getCurrentUser();
-  const users = DB.getUsers();
-  let files = DB.getFiles();
-
-  if (path === '/api/register') {
-    if (users[body.username]) throw new Error('Ce nom d\'utilisateur existe déjà');
-    const code = 'FS-' + Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-    users[body.username] = { username: body.username, password: body.password, code: code, friends: [] };
-    DB.saveUsers(users); DB.setCurrentUser(body.username);
-    return { user: { username: body.username, code: code } };
-  }
-
-  if (path === '/api/login') {
-    if (!users[body.username] || users[body.username].password !== body.password) throw new Error('Identifiants incorrects');
-    DB.setCurrentUser(body.username);
-    return { user: users[body.username] };
-  }
-
-  if (!activeUser) throw new Error('Session expirée');
-
-  if (path === '/api/me') return { user: users[activeUser] };
-  if (path === '/api/files') return { items: files.filter(f => f.userId === activeUser && f.parent === (body && body.parent ? body.parent : null)) };
-
-  if (path === '/api/file') {
-    const fileId = Date.now().toString() + Math.random().toString(36).substring(2,5);
-    files.push({ id: fileId, userId: activeUser, parent: body.parent, name: body.name, type: 'file', size: body.content ? body.content.length : 0, content: body.content, shared: false });
-    DB.saveFiles(files); return { success: true };
-  }
-
-  if (path === '/api/folder') {
-    const folderId = Date.now().toString() + Math.random().toString(36).substring(2,5);
-    files.push({ id: folderId, userId: activeUser, parent: body.parent, name: body.name, type: 'folder', size: 0, content: null, shared: false });
-    DB.saveFiles(files); return { success: true };
-  }
-
-  if (path === '/api/rename') {
-    const f = files.find(x => x.id === body.id && x.userId === activeUser);
-    if (f) { f.name = body.name; DB.saveFiles(files); } return { success: true };
-  }
-
-  if (path === '/api/delete') {
-    const toDelete = [body.id];
-    let added = true;
-    while (added) { added = false; files.forEach(f => { if (toDelete.includes(f.parent) && !toDelete.includes(f.id)) { toDelete.push(f.id); added = true; } }); }
-    files = files.filter(f => !toDelete.includes(f.id)); DB.saveFiles(files); return { success: true };
-  }
-
-  if (path === '/api/share') {
-    function setShareRecursive(id, isShared) {
-      const f = files.find(x => x.id === id && x.userId === activeUser);
-      if (f) f.shared = isShared;
-      if (f && f.type === 'folder') files.forEach(child => { if (child.parent === id) setShareRecursive(child.id, isShared); });
-    }
-    setShareRecursive(body.id, body.shared); DB.saveFiles(files); return { success: true };
-  }
-
-  if (path === '/api/friends') {
-    const myFriends = users[activeUser].friends || [];
-    return { friends: myFriends.map(fname => ({ id: fname, username: fname, sharedCount: files.filter(f => f.userId === fname && f.shared).length })) };
-  }
-
-  if (path === '/api/friend') {
-    const friendCode = body.code.trim().toUpperCase();
-    const foundUsername = Object.keys(users).find(u => users[u].code === friendCode);
-    if (!foundUsername) throw new Error('Code introuvable');
-    if (foundUsername === activeUser) throw new Error('Vous ne pouvez pas vous ajouter');
-    if (!users[activeUser].friends) users[activeUser].friends = [];
-    if (users[activeUser].friends.includes(foundUsername)) throw new Error('Déjà ami');
-    users[activeUser].friends.push(foundUsername); DB.saveUsers(users);
-    return { friend: { username: foundUsername } };
-  }
-
-  if (path.startsWith('/api/users/') && path.endsWith('/shared')) {
-    const friendId = decodeURIComponent(path.split('/')[3]);
-    const parentId = body && body.parent ? body.parent : null;
-    return { user: { username: friendId }, items: files.filter(f => f.userId === friendId && f.parent === parentId && f.shared) };
-  }
-  throw new Error('Route inconnue');
-}
-
-function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+// أدوات مساعدة
+function esc(s) { return String(s||'').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function fmtSize(b) { if (!b) return ''; const u = ['O', 'Ko', 'Mo', 'Go']; let i = 0; while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; } return (i ? b.toFixed(1) : b) + ' ' + u[i]; }
 function fileIcon(name, type) {
   if (type === 'folder') return '📁';
   const ext = (name.split('.').pop() || '').toLowerCase();
-  if (['png','jpg','jpeg','gif','webp'].includes(ext)) return '🖼️';
-  if (['mp4','mkv','avi','webm'].includes(ext)) return '🎬';
-  if (['mp3','wav','ogg','m4a'].includes(ext)) return '🎵';
+  if (['png','jpg','jpeg','gif','webp','svg'].includes(ext)) return '🖼️';
+  if (['mp4','webm','mkv'].includes(ext)) return '🎬';
+  if (['mp3','wav','ogg'].includes(ext)) return '🎵';
   if (['pdf'].includes(ext)) return '📕';
   if (['zip','rar','7z'].includes(ext)) return '📦';
   if (['txt','md','json','js','html','css'].includes(ext)) return '📝';
   return '📄';
+}
+function generateCode() {
+  return 'FS-' + Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
 }
 
 /* ==================================================================
@@ -348,7 +272,7 @@ document.addEventListener('click', e => { if (!e.target.closest('#ctxMenu')) clo
 document.addEventListener('scroll', closeMenu, true);
 
 /* ==================================================================
-   AUTH & APP INIT
+   AUTHENTIFICATION & SESSION
 ================================================================== */
 let authMode = 'login';
 $$('.tabs button').forEach(b => {
@@ -357,18 +281,65 @@ $$('.tabs button').forEach(b => {
     $('#auSubmit').textContent = authMode === 'login' ? 'Se connecter' : 'Créer un compte'; $('#auErr').textContent = '';
   };
 });
+
 $('#auSubmit').onclick = async () => {
   const u = $('#auUsername').value.trim(), p = $('#auPassword').value;
   $('#auErr').textContent = '';
   if (!u || !p) { $('#auErr').textContent = 'Remplissez tous les champs'; return; }
-  try {
-    const r = await api('/api/' + (authMode === 'login' ? 'login' : 'register'), { method: 'POST', body: { username: u, password: p } });
-    me = r.user; showApp();
-  } catch (e) { $('#auErr').textContent = e.message; }
-};
-$('#logoutBtn').onclick = () => { DB.setCurrentUser(null); currentUser = null; me = null; $('#appView').hidden = true; $('#authView').hidden = false; $('#auPassword').value = ''; };
+  
+  const email = `${u.replace(/[^a-zA-Z0-9]/g, '')}@fileshare.local`;
 
-(function init() { if (currentUser && me) showApp(); else $('#authView').hidden = false; })();
+  try {
+    $('#auSubmit').textContent = 'Chargement...';
+    if (authMode === 'register') {
+      const { data: authData, error: authErr } = await supabase.auth.signUp({ email, password: p });
+      if (authErr) throw new Error(authErr.message);
+
+      const code = generateCode();
+      const { error: profileErr } = await supabase.from('profiles').insert({
+        id: authData.user.id,
+        username: u,
+        friend_code: code
+      });
+      if (profileErr) throw new Error(profileErr.message);
+
+      me = { id: authData.user.id, username: u, code: code };
+    } else {
+      const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({ email, password: p });
+      if (authErr) throw new Error('Identifiants incorrects');
+
+      const { data: profile, error: profileErr } = await supabase.from('profiles').select('*').eq('id', authData.user.id).single();
+      if (profileErr || !profile) throw new Error('Profil introuvable');
+
+      me = { id: profile.id, username: profile.username, code: profile.friend_code };
+    }
+    
+    showApp();
+  } catch (e) { 
+    $('#auErr').textContent = e.message; 
+  } finally {
+    $('#auSubmit').textContent = authMode === 'login' ? 'Se connecter' : 'Créer un compte';
+  }
+};
+
+$('#logoutBtn').onclick = async () => {
+  await supabase.auth.signOut();
+  me = { id: null, username: '', code: '' };
+  $('#appView').hidden = true; $('#authView').hidden = false; $('#auPassword').value = '';
+};
+
+(async function checkSession() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+    if (profile) {
+      me = { id: profile.id, username: profile.username, code: profile.friend_code };
+      showApp();
+      return;
+    }
+  }
+  $('#authView').hidden = false;
+})();
 
 function showApp() {
   $('#authView').hidden = true; $('#appView').hidden = false;
@@ -376,6 +347,7 @@ function showApp() {
   st.parent = null; st.crumbs = [{ id: null, name: 'Mes fichiers' }];
   switchView('files'); loadFiles(); loadFriends(); renderProfile();
 }
+
 function switchView(name) {
   $$('.nav').forEach(n => n.classList.toggle('active', n.dataset.view === name));
   $('#viewFiles').hidden = name !== 'files'; $('#viewFriends').hidden = name !== 'friends'; $('#viewProfile').hidden = name !== 'profile';
@@ -384,11 +356,22 @@ function switchView(name) {
 $$('.nav').forEach(n => n.onclick = () => switchView(n.dataset.view));
 
 /* ==================================================================
-   FICHIERS
+   GESTIONNAIRE DE FICHIERS (CLOUD)
 ================================================================== */
 async function loadFiles() {
-  try { const r = await api('/api/files', { body: { parent: st.parent } }); st.items = r.items; renderFiles(); renderCrumb(); } catch (e) { console.error(e); }
+  try {
+    let query = supabase.from('files').select('*').eq('owner_id', me.id);
+    if (st.parent) query = query.eq('parent_id', st.parent);
+    else query = query.is('parent_id', null);
+    
+    const { data, error } = await query.order('created_at', { ascending: false });
+    if (error) throw error;
+    
+    st.items = data || [];
+    renderFiles(); renderCrumb();
+  } catch (e) { console.error('Erreur chargement:', e.message); }
 }
+
 function renderCrumb() {
   const c = $('#crumb'); c.innerHTML = '';
   st.crumbs.forEach((cr, i) => {
@@ -398,11 +381,13 @@ function renderCrumb() {
     c.appendChild(b);
   });
 }
+
 function renderFiles() {
   const g = $('#fileGrid'); g.innerHTML = '';
   if (!st.items.length) { g.innerHTML = `<div class="empty" style="grid-column:1/-1">📂 Ce dossier est vide</div>`; return; }
   st.items.forEach(item => g.appendChild(makeCard(item, false)));
 }
+
 function makeCard(item, isFriend) {
   const card = document.createElement('div'); card.className = 'file-card';
   card.innerHTML = `${item.shared ? '<div class="badge-share">PARTAGÉ</div>' : ''}<div class="ico">${fileIcon(item.name, item.type)}</div><div class="nm">${esc(item.name)}</div><div class="sz">${item.type === 'folder' ? 'Dossier' : fmtSize(item.size)}</div>`;
@@ -415,72 +400,150 @@ function makeCard(item, isFriend) {
   };
   return card;
 }
+
 function openItem(item) {
   if (item.type === 'folder') { st.crumbs.push({ id: item.id, name: item.name }); st.parent = item.id; loadFiles(); }
   else previewItem(item);
 }
+
 async function previewItem(item) {
   try {
-    if (!item.content) return alert("Fichier vide");
-    const b64 = item.content.split(',')[1] || item.content;
-    const byteCharacters = atob(b64); const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
-    const blob = new Blob([new Uint8Array(byteNumbers)], { type: 'application/octet-stream' });
-    const url = URL.createObjectURL(blob); const ext = (item.name.split('.').pop() || '').toLowerCase(); let html = '';
-    if (['png','jpg','jpeg','gif','webp','svg'].includes(ext)) html = `<img src="${url}">`;
-    else if (['mp4','webm'].includes(ext)) html = `<video src="${url}" controls></video>`;
-    else if (['mp3','wav','m4a'].includes(ext)) html = `<audio src="${url}" controls style="width:100%"></audio>`;
-    else if (['txt','md','json','js','css','html'].includes(ext)) html = `<pre>${esc(decodeURIComponent(escape(atob(b64))).slice(0,30000))}</pre>`;
-    else html = `<p class="muted">Aperçu indisponible. Utilisez "Télécharger".</p>`;
-    showHTMLModal(item.name, html); setTimeout(() => URL.revokeObjectURL(url), 60000);
+    if (!item.url) return alert("Fichier sans URL (vide)");
+    const ext = (item.name.split('.').pop() || '').toLowerCase(); let html = '';
+    if (['png','jpg','jpeg','gif','webp','svg'].includes(ext)) html = `<img src="${item.url}">`;
+    else if (['mp4','webm'].includes(ext)) html = `<video src="${item.url}" controls></video>`;
+    else if (['mp3','wav','m4a'].includes(ext)) html = `<audio src="${item.url}" controls style="width:100%"></audio>`;
+    else html = `<p class="muted">Aperçu non disponible. Utilisez "Télécharger".</p>`;
+    showHTMLModal(item.name, html);
   } catch (e) { alert("Erreur : " + e.message); }
 }
+
 async function downloadItem(item) {
-  if (!item.content) return alert("Fichier vide");
-  const a = document.createElement('a'); a.href = item.content.startsWith('data:') ? item.content : 'data:application/octet-stream;base64,' + item.content;
-  a.download = item.name; document.body.appendChild(a); a.click(); a.remove();
+  if (!item.url) return alert("Fichier non disponible");
+  const a = document.createElement('a'); a.href = item.url; a.download = item.name;
+  document.body.appendChild(a); a.click(); a.remove();
 }
+
 function renameItem(item) {
   openModal({ title: 'Renommer', fields: [{ name: 'name', label: 'Nouveau nom', value: item.name }],
-    onSubmit: async d => { const n = d.name.trim(); if (!n) throw new Error('Requis'); await api('/api/rename', { method: 'POST', body: { id: item.id, name: n } }); closeModal(); loadFiles(); } });
+    onSubmit: async d => { 
+      const n = d.name.trim(); if (!n) throw new Error('Requis'); 
+      const { error } = await supabase.from('files').update({ name: n }).eq('id', item.id); 
+      if (error) throw error;
+      closeModal(); loadFiles(); 
+    } });
 }
+
 async function deleteItem(item) {
   if (!confirm(`Supprimer "${item.name}" ?`)) return;
-  try { await api('/api/delete', { method: 'POST', body: { id: item.id } }); loadFiles(); } catch (e) { alert(e.message); }
+  try { 
+    const { error } = await supabase.from('files').delete().eq('id', item.id); 
+    if (error) throw error;
+    loadFiles(); 
+  } catch (e) { alert(e.message); }
 }
-async function toggleShare(item) {
-  try { await api('/api/share', { method: 'POST', body: { id: item.id, shared: !item.shared } }); loadFiles(); } catch (e) { alert(e.message); }
+
+async function toggleShare(item, forceState = null) {
+  const newState = forceState !== null ? forceState : !item.shared;
+  try { 
+    const { error } = await supabase.from('files').update({ shared: newState }).eq('id', item.id); 
+    if (error) throw error;
+    
+    if (item.type === 'folder') {
+      const { data: children } = await supabase.from('files').select('id').eq('parent_id', item.id);
+      if (children) {
+        for (const child of children) await toggleShare(child, newState);
+      }
+    }
+    if (forceState === null) loadFiles(); 
+  } catch (e) { alert(e.message); }
 }
+
+/* ---------- TÉLÉVERSER (STORAGE) ---------- */
 $('#btnUpload').onclick = () => $('#fileInput').click();
 $('#fileInput').onchange = async e => {
   const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
+  
   for (const f of files) {
-    if (f.size > 4 * 1024 * 1024) { alert('Max 4MB (Demo): ' + f.name); continue; }
-    const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
-    try { await api('/api/file', { method: 'POST', body: { parent: st.parent, name: f.name, content: b64 } }); } catch (err) { alert(err.message); }
+    if (f.size > 10 * 1024 * 1024) { alert('Max 10MB: ' + f.name); continue; }
+    try {
+      $('#btnUpload').textContent = '⏳...';
+      const fileName = `${Date.now()}_${f.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      
+      const { error: uploadError } = await supabase.storage.from('files').upload(fileName, f);
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('files').getPublicUrl(fileName);
+
+      const { error: dbError } = await supabase.from('files').insert({
+        owner_id: me.id, parent_id: st.parent, name: f.name, type: 'file', size: f.size, url: publicUrl, shared: false
+      });
+      if (dbError) throw dbError;
+      
+    } catch (err) { alert(err.message); }
   }
+  $('#btnUpload').textContent = '⬆️ Téléverser';
   loadFiles();
 };
+
+/* ---------- NOUVEAU FICHIER / DOSSIER ---------- */
 $('#btnNewFile').onclick = () => {
   openModal({ title: 'Nouveau fichier', fields: [{ name: 'base', label: 'Nom', placeholder: 'notes' }, { name: 'ext', label: 'Extension', placeholder: 'txt' }, { name: 'content', label: 'Contenu', type: 'textarea' }],
     onSubmit: async d => {
-      if (!d.base.trim()) throw new Error('Nom requis'); const name = d.ext.trim() ? `${d.base.trim()}.${d.ext.trim().replace(/^\./, '')}` : d.base.trim();
-      const b64 = btoa(unescape(encodeURIComponent(d.content || ''))); await api('/api/file', { method: 'POST', body: { parent: st.parent, name, content: 'data:text/plain;base64,' + b64 } });
+      if (!d.base.trim()) throw new Error('Nom requis'); 
+      const name = d.ext.trim() ? `${d.base.trim()}.${d.ext.trim().replace(/^\./, '')}` : d.base.trim();
+      const blob = new Blob([d.content || ''], { type: 'text/plain' });
+      const fileName = `${Date.now()}_${name}`;
+
+      const { error: uploadError } = await supabase.storage.from('files').upload(fileName, blob);
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('files').getPublicUrl(fileName);
+
+      const { error: dbError } = await supabase.from('files').insert({
+        owner_id: me.id, parent_id: st.parent, name: name, type: 'file', size: blob.size, url: publicUrl, shared: false
+      });
+      if (dbError) throw dbError;
+
       closeModal(); loadFiles();
     } });
 };
+
 $('#btnNewFolder').onclick = () => {
   openModal({ title: 'Nouveau dossier', fields: [{ name: 'name', label: 'Nom' }],
-    onSubmit: async d => { if (!d.name.trim()) throw new Error('Requis'); await api('/api/folder', { method: 'POST', body: { parent: st.parent, name: d.name.trim() } }); closeModal(); loadFiles(); } });
+    onSubmit: async d => { 
+      if (!d.name.trim()) throw new Error('Requis'); 
+      const { error } = await supabase.from('files').insert({
+        owner_id: me.id, parent_id: st.parent, name: d.name.trim(), type: 'folder', size: 0, shared: false
+      });
+      if (error) throw error;
+      closeModal(); loadFiles(); 
+    } });
 };
 $('#btnRefresh').onclick = () => loadFiles();
 
 /* ==================================================================
-   AMIS & CAMERA (QR SCANNER avec html5-qrcode)
+   AMIS (CLOUD)
 ================================================================== */
 async function loadFriends() {
-  try { const r = await api('/api/friends'); renderFriends(r.friends); } catch (e) {}
+  try {
+    const { data: friendLinks, error: fError } = await supabase.from('friends').select('friend_id').eq('user_id', me.id);
+    if (fError) throw fError;
+    if (!friendLinks || friendLinks.length === 0) return renderFriends([]);
+
+    const friendIds = friendLinks.map(f => f.friend_id);
+    const { data: profiles, error: pError } = await supabase.from('profiles').select('id, username').in('id', friendIds);
+    if (pError) throw pError;
+
+    const friendsList = [];
+    for (const profile of profiles) {
+      const { count } = await supabase.from('files').select('*', { count: 'exact', head: true }).eq('owner_id', profile.id).eq('shared', true);
+      friendsList.push({ id: profile.id, username: profile.username, sharedCount: count || 0 });
+    }
+    renderFriends(friendsList);
+  } catch (e) { console.error(e); }
 }
+
 function renderFriends(list) {
   const box = $('#friendsList'); $('#btnBackFriends').hidden = true; $('#friendName').hidden = true; $('#friendGrid').hidden = true; box.hidden = false; box.innerHTML = '';
   if (!list.length) { box.innerHTML = `<div class="empty" style="grid-column:1/-1">Aucun ami</div>`; return; }
@@ -490,18 +553,27 @@ function renderFriends(list) {
     c.onclick = () => openFriend(f); box.appendChild(c);
   });
 }
+
 async function openFriend(f, parentId = null, crumbName = null, isBack = false) {
   try {
     if (!friendState.id || friendState.id !== f.id) { friendState.id = f.id; friendState.crumbs = [{ id: null, name: 'Partagés' }]; friendState.parent = null; }
     if (isBack) friendState.crumbs.pop(); else if (parentId) friendState.crumbs.push({ id: parentId, name: crumbName });
     friendState.parent = friendState.crumbs[friendState.crumbs.length - 1].id;
-    const r = await api('/api/users/' + encodeURIComponent(friendState.id) + '/shared', { body: { parent: friendState.parent } });
+
+    let query = supabase.from('files').select('*').eq('owner_id', friendState.id).eq('shared', true);
+    if (friendState.parent) query = query.eq('parent_id', friendState.parent);
+    else query = query.is('parent_id', null);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
     $('#friendsList').hidden = true; $('#btnBackFriends').hidden = false; $('#friendName').hidden = false; $('#friendName').textContent = 'Dossier: ' + (friendState.crumbs.length > 1 ? friendState.crumbs[friendState.crumbs.length - 1].name : 'Partagés');
     const g = $('#friendGrid'); g.hidden = false; g.innerHTML = '';
-    if (!r.items.length) g.innerHTML = `<div class="empty" style="grid-column:1/-1">Vide</div>`;
-    else r.items.forEach(item => g.appendChild(makeCard(item, true)));
+    if (!data || !data.length) g.innerHTML = `<div class="empty" style="grid-column:1/-1">Vide</div>`;
+    else data.forEach(item => g.appendChild(makeCard(item, true)));
   } catch (e) { alert(e.message); }
 }
+
 function friendItemMenu(e, item) {
   const menu = [];
   if (item.type === 'folder') menu.push({ label: '📂 Ouvrir', action: () => openFriend({ id: friendState.id }, item.id, item.name) });
@@ -512,46 +584,106 @@ $('#btnBackFriends').onclick = () => { if (friendState.crumbs.length > 1) openFr
 
 $('#btnAddFriend').onclick = () => {
   openModal({ title: 'Ajouter un ami', fields: [{ name: 'code', label: 'Code ami', placeholder: 'FS-XXXX-XXXX' }], submitText: 'Ajouter',
-    onSubmit: async d => { if (!d.code.trim()) throw new Error('Requis'); const r = await api('/api/friend', { method: 'POST', body: { code: d.code.trim() } }); closeModal(); alert('Ami ajouté : ' + r.friend.username); loadFriends(); },
+    onSubmit: async d => { 
+      if (!d.code.trim()) throw new Error('Requis'); 
+      const code = d.code.trim().toUpperCase();
+      
+      const { data: profile, error: pError } = await supabase.from('profiles').select('id, username').eq('friend_code', code).single();
+      if (pError || !profile) throw new Error('Code introuvable');
+      if (profile.id === me.id) throw new Error('Vous ne pouvez pas vous ajouter');
+
+      const { data: existing } = await supabase.from('friends').select('*').eq('user_id', me.id).eq('friend_id', profile.id).single();
+      if (existing) throw new Error('Déjà ami');
+
+      const { error: insertError } = await supabase.from('friends').insert({ user_id: me.id, friend_id: profile.id });
+      if (insertError) throw insertError;
+
+      closeModal(); alert('Ami ajouté : ' + profile.username); loadFriends(); 
+    },
     extraHTML: `<button type="button" class="ghost" id="scanBtn" style="width:100%">📷 Scanner le QR code</button>` });
   setTimeout(() => { const s = $('#scanBtn'); if (s) s.onclick = scanQR; }, 50);
 };
 
+/* ---------- SCANNER QR (Caméra ou Image) ---------- */
 async function scanQR() {
   modalRoot.innerHTML = `
     <div class="modal-back">
       <div class="modal">
-        <h3>Scannez le QR code</h3>
-        <div id="reader"></div>
-        <div class="modal-actions"><button class="ghost" id="closeScanBtn">Annuler</button></div>
+        <h3>Scanner un QR code</h3>
+        
+        <div id="scanOptions" style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+          <button class="primary" id="btnCamera" style="padding:15px; font-size:16px;">📷 Ouvrir la caméra</button>
+          <button class="ghost" id="btnGallery" style="padding:15px; font-size:16px;">🖼️ Choisir une image (Galerie)</button>
+        </div>
+
+        <div id="reader" style="display:none;"></div>
+        <input type="file" id="qrFileInput" accept="image/*" hidden>
+        
+        <div class="modal-actions" style="justify-content:center; margin-top:15px;">
+          <button class="ghost" id="closeScanBtn" style="width:100%">Annuler</button>
+        </div>
       </div>
     </div>`;
   
-  const html5QrCode = new Html5Qrcode("reader");
-  $('#closeScanBtn').onclick = () => {
-    html5QrCode.stop().then(() => closeModal()).catch(() => closeModal());
+  let html5QrCode = new Html5Qrcode("reader");
+
+  const closeScan = () => {
+    if (html5QrCode.isScanning) {
+      html5QrCode.stop().then(() => closeModal()).catch(() => closeModal());
+    } else {
+      closeModal();
+    }
+  };
+  $('#closeScanBtn').onclick = closeScan;
+
+  const onScanSuccess = async (decodedText) => {
+    if (html5QrCode.isScanning) await html5QrCode.stop();
+    closeModal();
+    try {
+      const code = decodedText.trim().toUpperCase();
+      const { data: profile, error: pError } = await supabase.from('profiles').select('id, username').eq('friend_code', code).single();
+      if (pError || !profile) throw new Error('Code invalide');
+      if (profile.id === me.id) throw new Error('C\'est votre propre code');
+      
+      const { data: existing } = await supabase.from('friends').select('*').eq('user_id', me.id).eq('friend_id', profile.id).single();
+      if (existing) throw new Error('Déjà ami');
+
+      await supabase.from('friends').insert({ user_id: me.id, friend_id: profile.id });
+      alert('Ami ajouté : ' + profile.username);
+      loadFriends();
+    } catch (err) { alert(err.message); }
   };
 
-  try {
-    await html5QrCode.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      async (decodedText) => {
-        // عند قراءة الكود بنجاح
-        await html5QrCode.stop();
-        closeModal();
-        try {
-          const r = await api('/api/friend', { method: 'POST', body: { code: decodedText } });
-          alert('Ami ajouté : ' + r.friend.username);
-          loadFriends();
-        } catch (err) { alert(err.message); }
-      },
-      (errorMessage) => { /* تجاهل أخطاء القراءة المستمرة */ }
-    );
-  } catch (err) {
-    alert("Impossible d'accéder à la caméra: " + err);
-    closeModal();
-  }
+  $('#btnCamera').onclick = async () => {
+    $('#scanOptions').style.display = 'none';
+    $('#reader').style.display = 'block';
+    try {
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        onScanSuccess,
+        (errorMessage) => {}
+      );
+    } catch (err) {
+      alert("Impossible d'accéder à la caméra: " + err);
+      $('#scanOptions').style.display = 'flex';
+      $('#reader').style.display = 'none';
+    }
+  };
+
+  $('#btnGallery').onclick = () => $('#qrFileInput').click();
+
+  $('#qrFileInput').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const decodedText = await html5Qrcode.scanFile(file, true);
+      onScanSuccess(decodedText);
+    } catch (err) {
+      alert("Aucun QR code valide trouvé dans l'image.");
+    }
+    e.target.value = '';
+  };
 }
 
 /* ==================================================================
