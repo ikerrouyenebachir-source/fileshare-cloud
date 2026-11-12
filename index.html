@@ -4,17 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>FileShare — Cloud Platform</title>
-<!-- مكتبات QR -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
-<!-- مكتبة Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  :root{
-    --bg:#0e1120; --bg2:#151a2e; --card:#1b2140; --card2:#222a4f;
-    --line:#2a3358; --txt:#e8ecff; --muted:#8e98c4; --acc:#6c8cff; --acc2:#8f6cff;
-    --danger:#ff5d6c; --ok:#39d98a;
-  }
+  :root{ --bg:#0e1120; --bg2:#151a2e; --card:#1b2140; --card2:#222a4f; --line:#2a3358; --txt:#e8ecff; --muted:#8e98c4; --acc:#6c8cff; --acc2:#8f6cff; --danger:#ff5d6c; --ok:#39d98a; }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
   [hidden]{display:none !important}
   body{margin:0; font-family:"Segoe UI",Tahoma,system-ui,sans-serif; background:radial-gradient(1200px 700px at 80% -10%,#1c2a5c 0%,var(--bg) 55%) fixed; color:var(--txt); min-height:100vh;}
@@ -26,7 +20,6 @@
   .ghost{background:var(--card2); color:var(--txt); padding:9px 14px}
   .ghost:hover{background:#2c3768}
   .muted{color:var(--muted); font-size:13px}
-
   #authView{display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px}
   .auth-card{width:100%; max-width:400px; background:var(--card); border:1px solid var(--line); border-radius:20px; padding:30px 26px; box-shadow:0 30px 60px rgba(0,0,0,.45);}
   .auth-card h1{margin:0 0 6px; font-size:26px; text-align:center}
@@ -36,8 +29,7 @@
   .tabs button.active{background:var(--card2); color:#fff}
   .auth-card input{margin-bottom:12px}
   .auth-card .primary{width:100%; margin-top:6px}
-  .err{color:var(--danger); font-size:13px; margin-top:12px; min-height:18px; text-align:center}
-
+  .err{color:var(--danger); font-size:13px; margin-top:12px; min-height:18px; text-align:center; font-weight:bold;}
   .topbar{display:flex; align-items:center; gap:14px; padding:12px 18px; background:rgba(21,26,46,.85); backdrop-filter:blur(12px); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:50;}
   .brand{font-weight:800; font-size:18px}
   .spacer{flex:1}
@@ -49,13 +41,11 @@
   .nav:hover{background:var(--card2); color:var(--txt)}
   .nav.active{background:linear-gradient(135deg,rgba(108,140,255,.25),rgba(143,108,255,.2)); color:#fff}
   .main{flex:1; padding:18px 22px; overflow:auto}
-
   .toolbar{display:flex; flex-wrap:wrap; gap:9px; align-items:center; margin-bottom:16px}
   .toolbar .ghost{padding:9px 13px}
   .crumb{display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:14px; color:var(--muted); margin-left:auto}
   .crumb button{background:transparent; color:var(--acc); padding:4px 6px; font-size:14px}
   .crumb span{opacity:.5}
-
   .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(122px,1fr)); gap:12px}
   .file-card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 10px; text-align:center; user-select:none; transition:.15s; position:relative;}
   .file-card:hover{background:var(--card2); border-color:var(--acc); transform:translateY(-2px)}
@@ -64,7 +54,6 @@
   .file-card .sz{font-size:11px; color:var(--muted); margin-top:4px}
   .badge-share{position:absolute; top:7px; right:7px; background:var(--ok); color:#04120a; font-size:10px; font-weight:800; padding:2px 6px; border-radius:20px;}
   .empty{text-align:center; padding:50px 20px; color:var(--muted)}
-
   .ctx-menu{position:fixed; z-index:900; background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:6px; min-width:185px; box-shadow:0 18px 40px rgba(0,0,0,.55); animation:pop .12s ease-out;}
   @keyframes pop{from{opacity:0; transform:scale(.95)} to{opacity:1; transform:scale(1)}}
   .ctx-menu button{display:block; width:100%; text-align:left; padding:10px 12px; background:transparent; color:var(--txt); font-size:13.5px; border-radius:8px;}
@@ -72,7 +61,6 @@
   .ctx-menu button.danger{color:var(--danger)}
   .ctx-menu button.danger:hover{background:rgba(255,93,108,.18)}
   .ctx-menu .sep{height:1px; background:var(--line); margin:5px 4px}
-
   .modal-back{position:fixed; inset:0; background:rgba(5,8,20,.7); backdrop-filter:blur(4px); z-index:1000; display:grid; place-items:center; padding:20px;}
   .modal{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:24px; width:100%; max-width:430px; max-height:88vh; overflow:auto; box-shadow:0 30px 70px rgba(0,0,0,.6);}
   .modal h3{margin:0 0 16px; font-size:18px}
@@ -83,20 +71,17 @@
   .modal-actions .primary{flex:1}
   .modal img,.modal video{max-width:100%; border-radius:10px; display:block; margin:auto}
   .modal pre{background:#0d1226; padding:14px; border-radius:10px; overflow:auto; max-height:55vh; font-size:12.5px; direction:ltr; text-align:left; white-space:pre-wrap;}
-
   .friends{display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px}
   .friend-card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; display:flex; align-items:center; gap:12px; transition:.15s; cursor:pointer;}
   .friend-card:hover{background:var(--card2); border-color:var(--acc); transform:translateY(-2px)}
   .friend-card .avatar{width:42px; height:42px; font-size:18px; flex-shrink:0}
   .friend-card .fn{font-weight:600; font-size:14px}
   .friend-card .fc{font-size:11.5px; color:var(--muted)}
-
   .profile-card{background:var(--card); border:1px solid var(--line); border-radius:20px; padding:30px; max-width:430px; margin:0 auto; text-align:center;}
   #qrBox{background:#fff; padding:14px; border-radius:14px; display:inline-block; min-height:60px; min-width:60px}
   #qrBox img,#qrBox canvas{display:block}
   .code{font-family:monospace; font-size:21px; letter-spacing:2px; margin:18px 0 12px; background:#0d1226; padding:12px; border-radius:12px; border:1px dashed var(--line);}
   #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 10px; }
-  
   @media(max-width:720px){
     .layout{flex-direction:column}
     .sidebar{width:100%; flex-direction:row; overflow-x:auto; border-right:none; border-bottom:1px solid var(--line)}
@@ -107,7 +92,6 @@
 </head>
 <body>
 
-<!-- ============ ÉCRAN DE CONNEXION ============ -->
 <div id="authView" hidden>
   <div class="auth-card">
     <h1>📁 FileShare</h1>
@@ -123,7 +107,6 @@
   </div>
 </div>
 
-<!-- ============ APPLICATION ============ -->
 <div id="appView" hidden>
   <header class="topbar">
     <div class="brand">📁 FileShare Cloud</div>
@@ -182,22 +165,30 @@
 /* ==================================================================
    🚨🚨 مكان وضع المفاتيح الخاصة بك 🚨🚨
    ==================================================================
-   اذهب إلى مشروعك في Supabase، ثم إلى Project Settings -> API
-   وانسخ القيمتين وضعهما بين علامات التنصيص "" أدناه:
+   ملاحظة هامة: الرابط لا يجب أن ينتهي بـ /rest/v1/
+   والمفتاح يجب أن يكون كاملاً ويبدأ بـ eyJ...
 */
-const SUPABASE_URL = "https://ugfpishtwrwndgbuvnha.supabase.co/rest/v1/";           
+const SUPABASE_URL = "https://ugfpishtwrwndgbuvnha.supabase.co";           
 const SUPABASE_ANON_KEY = "sb_publishable_JxsMkEUdCphB4SFFfDJmvw_NKTDbqCm"; 
 /* ================================================================== */
-
-// تهيئة عميل Supabase
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
+let supabase = null;
 let me = { id: null, username: '', code: '' };
 const st = { parent: null, crumbs: [{ id: null, name: 'Mes fichiers' }], items: [] };
 let friendState = { id: null, parent: null, crumbs: [] };
+
+// تهيئة آمنة (لمنع الشاشة السوداء)
+try {
+  if (!SUPABASE_URL.startsWith('https://') || SUPABASE_URL.includes('/rest/v1') || SUPABASE_ANON_KEY.length < 50) {
+    throw new Error("URL ou Clé invalide");
+  }
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch (e) {
+  console.error("Supabase Init Error:", e);
+}
 
 // أدوات مساعدة
 function esc(s) { return String(s||'').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -213,9 +204,7 @@ function fileIcon(name, type) {
   if (['txt','md','json','js','html','css'].includes(ext)) return '📝';
   return '📄';
 }
-function generateCode() {
-  return 'FS-' + Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-}
+function generateCode() { return 'FS-' + Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase(); }
 
 /* ==================================================================
    MODALES & MENU
@@ -283,6 +272,7 @@ $$('.tabs button').forEach(b => {
 });
 
 $('#auSubmit').onclick = async () => {
+  if (!supabase) { $('#auErr').textContent = "Erreur: Clés Supabase invalides ou manquantes dans le code."; return; }
   const u = $('#auUsername').value.trim(), p = $('#auPassword').value;
   $('#auErr').textContent = '';
   if (!u || !p) { $('#auErr').textContent = 'Remplissez tous les champs'; return; }
@@ -297,9 +287,7 @@ $('#auSubmit').onclick = async () => {
 
       const code = generateCode();
       const { error: profileErr } = await supabase.from('profiles').insert({
-        id: authData.user.id,
-        username: u,
-        friend_code: code
+        id: authData.user.id, username: u, friend_code: code
       });
       if (profileErr) throw new Error(profileErr.message);
 
@@ -313,7 +301,6 @@ $('#auSubmit').onclick = async () => {
 
       me = { id: profile.id, username: profile.username, code: profile.friend_code };
     }
-    
     showApp();
   } catch (e) { 
     $('#auErr').textContent = e.message; 
@@ -323,22 +310,35 @@ $('#auSubmit').onclick = async () => {
 };
 
 $('#logoutBtn').onclick = async () => {
-  await supabase.auth.signOut();
+  if(supabase) await supabase.auth.signOut();
   me = { id: null, username: '', code: '' };
   $('#appView').hidden = true; $('#authView').hidden = false; $('#auPassword').value = '';
 };
 
+// التحقق من الجلسة
 (async function checkSession() {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session) {
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-    if (profile) {
-      me = { id: profile.id, username: profile.username, code: profile.friend_code };
-      showApp();
-      return;
-    }
+  if (!supabase) {
+    $('#authView').hidden = false;
+    $('#auErr').textContent = "⚠️ Erreur de connexion Supabase. Vérifiez vos clés dans le code.";
+    return;
   }
-  $('#authView').hidden = false;
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    if (session) {
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+      if (profile) {
+        me = { id: profile.id, username: profile.username, code: profile.friend_code };
+        showApp();
+        return;
+      }
+    }
+    $('#authView').hidden = false;
+  } catch (err) {
+    console.error(err);
+    $('#authView').hidden = false;
+    $('#auErr').textContent = "Erreur réseau : Vérifiez votre connexion internet.";
+  }
 })();
 
 function showApp() {
@@ -356,9 +356,10 @@ function switchView(name) {
 $$('.nav').forEach(n => n.onclick = () => switchView(n.dataset.view));
 
 /* ==================================================================
-   GESTIONNAIRE DE FICHIERS (CLOUD)
+   GESTIONNAIRE DE FICHIERS
 ================================================================== */
 async function loadFiles() {
+  if(!supabase) return;
   try {
     let query = supabase.from('files').select('*').eq('owner_id', me.id);
     if (st.parent) query = query.eq('parent_id', st.parent);
@@ -459,9 +460,10 @@ async function toggleShare(item, forceState = null) {
   } catch (e) { alert(e.message); }
 }
 
-/* ---------- TÉLÉVERSER (STORAGE) ---------- */
+/* ---------- TÉLÉVERSER ---------- */
 $('#btnUpload').onclick = () => $('#fileInput').click();
 $('#fileInput').onchange = async e => {
+  if (!supabase) return alert("Erreur de connexion");
   const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
   
   for (const f of files) {
@@ -523,9 +525,10 @@ $('#btnNewFolder').onclick = () => {
 $('#btnRefresh').onclick = () => loadFiles();
 
 /* ==================================================================
-   AMIS (CLOUD)
+   AMIS
 ================================================================== */
 async function loadFriends() {
+  if(!supabase) return;
   try {
     const { data: friendLinks, error: fError } = await supabase.from('friends').select('friend_id').eq('user_id', me.id);
     if (fError) throw fError;
@@ -610,15 +613,12 @@ async function scanQR() {
     <div class="modal-back">
       <div class="modal">
         <h3>Scanner un QR code</h3>
-        
         <div id="scanOptions" style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
           <button class="primary" id="btnCamera" style="padding:15px; font-size:16px;">📷 Ouvrir la caméra</button>
           <button class="ghost" id="btnGallery" style="padding:15px; font-size:16px;">🖼️ Choisir une image (Galerie)</button>
         </div>
-
         <div id="reader" style="display:none;"></div>
         <input type="file" id="qrFileInput" accept="image/*" hidden>
-        
         <div class="modal-actions" style="justify-content:center; margin-top:15px;">
           <button class="ghost" id="closeScanBtn" style="width:100%">Annuler</button>
         </div>
@@ -628,11 +628,8 @@ async function scanQR() {
   let html5QrCode = new Html5Qrcode("reader");
 
   const closeScan = () => {
-    if (html5QrCode.isScanning) {
-      html5QrCode.stop().then(() => closeModal()).catch(() => closeModal());
-    } else {
-      closeModal();
-    }
+    if (html5QrCode.isScanning) html5QrCode.stop().then(() => closeModal()).catch(() => closeModal());
+    else closeModal();
   };
   $('#closeScanBtn').onclick = closeScan;
 
@@ -658,16 +655,10 @@ async function scanQR() {
     $('#scanOptions').style.display = 'none';
     $('#reader').style.display = 'block';
     try {
-      await html5QrCode.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        onScanSuccess,
-        (errorMessage) => {}
-      );
+      await html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess, () => {});
     } catch (err) {
       alert("Impossible d'accéder à la caméra: " + err);
-      $('#scanOptions').style.display = 'flex';
-      $('#reader').style.display = 'none';
+      $('#scanOptions').style.display = 'flex'; $('#reader').style.display = 'none';
     }
   };
 
@@ -679,9 +670,7 @@ async function scanQR() {
     try {
       const decodedText = await html5Qrcode.scanFile(file, true);
       onScanSuccess(decodedText);
-    } catch (err) {
-      alert("Aucun QR code valide trouvé dans l'image.");
-    }
+    } catch (err) { alert("Aucun QR code valide trouvé dans l'image."); }
     e.target.value = '';
   };
 }
