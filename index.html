@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>FileShare — Cloud Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<style>
+  :root{
+    --bg:#0e1120; --bg2:#151a2e; --card:#1b2140; --card2:#222a4f;
+    --line:#2a3358; --txt:#e8ecff; --muted:#8e98c4; --acc:#6c8cff; --acc2:#8f6cff;
+    --danger:#ff5d6c; --ok:#39d98a;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  [hidden]{display:none !important}
+  body{margin:0; font-family:"Segoe UI",Tahoma,system-ui,sans-serif; background:radial-gradient(1200px 700px at 80% -10%,#1c2a5c 0%,var(--bg) 55%) fixed; color:var(--txt); min-height:100vh;}
+  button{font-family:inherit; cursor:pointer; border:none; border-radius:10px; font-size:14px}
+  input,textarea{font-family:inherit; width:100%; padding:11px 13px; border-radius:10px; border:1px solid var(--line); background:#0d1226; color:var(--txt); font-size:14px; outline:none;}
+  input:focus,textarea:focus{border-color:var(--acc)}
+  .primary{background:linear-gradient(135deg,var(--acc),var(--acc2)); color:#fff; padding:11px 18px; font-weight:600}
+  .primary:hover{filter:brightness(1.1)}
+  .ghost{background:var(--card2); color:var(--txt); padding:9px 14px}
+  .ghost:hover{background:#2c3768}
+  .muted{color:var(--muted); font-size:13px}
+
+  #authView{display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px}
+  .auth-card{width:100%; max-width:400px; background:var(--card); border:1px solid var(--line); border-radius:20px; padding:30px 26px; box-shadow:0 30px 60px rgba(0,0,0,.45);}
+  .auth-card h1{margin:0 0 6px; font-size:26px; text-align:center}
+  .auth-card .sub{text-align:center; margin:0 0 22px}
+  .tabs{display:flex; gap:8px; background:#0d1226; padding:5px; border-radius:12px; margin-bottom:18px}
+  .tabs button{flex:1; padding:10px; background:transparent; color:var(--muted); font-weight:600}
+  .tabs button.active{background:var(--card2); color:#fff}
+  .auth-card input{margin-bottom:12px}
+  .auth-card .primary{width:100%; margin-top:6px}
+  .err{color:var(--danger); font-size:13px; margin-top:12px; min-height:18px; text-align:center}
+
+  .topbar{display:flex; align-items:center; gap:14px; padding:12px 18px; background:rgba(21,26,46,.85); backdrop-filter:blur(12px); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:50;}
+  .brand{font-weight:800; font-size:18px}
+  .spacer{flex:1}
+  .userchip{display:flex; align-items:center; gap:8px; background:var(--card2); padding:6px 12px 6px 6px; border-radius:30px; font-size:14px}
+  .avatar{width:28px; height:28px; border-radius:50%; display:grid; place-items:center; background:linear-gradient(135deg,var(--acc),var(--acc2)); font-weight:700; font-size:14px;}
+  .layout{display:flex; min-height:calc(100vh - 57px)}
+  .sidebar{width:220px; flex-shrink:0; padding:16px 12px; border-right:1px solid var(--line); display:flex; flex-direction:column; gap:6px; background:rgba(13,18,38,.5);}
+  .nav{text-align:left; padding:12px 14px; background:transparent; color:var(--muted); font-weight:600; border-radius:12px; font-size:14px;}
+  .nav:hover{background:var(--card2); color:var(--txt)}
+  .nav.active{background:linear-gradient(135deg,rgba(108,140,255,.25),rgba(143,108,255,.2)); color:#fff}
+  .main{flex:1; padding:18px 22px; overflow:auto}
+
+  .toolbar{display:flex; flex-wrap:wrap; gap:9px; align-items:center; margin-bottom:16px}
+  .toolbar .ghost{padding:9px 13px}
+  .crumb{display:flex; flex-wrap:wrap; gap:4px; align-items:center; font-size:14px; color:var(--muted); margin-left:auto}
+  .crumb button{background:transparent; color:var(--acc); padding:4px 6px; font-size:14px}
+  .crumb span{opacity:.5}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(122px,1fr)); gap:12px}
+  .file-card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 10px; text-align:center; user-select:none; transition:.15s; position:relative;}
+  .file-card:hover{background:var(--card2); border-color:var(--acc); transform:translateY(-2px)}
+  .file-card .ico{font-size:36px; line-height:1; margin-bottom:8px}
+  .file-card .nm{font-size:12.5px; word-break:break-all; line-height:1.35; max-height:36px; overflow:hidden}
+  .file-card .sz{font-size:11px; color:var(--muted); margin-top:4px}
+  .badge-share{position:absolute; top:7px; right:7px; background:var(--ok); color:#04120a; font-size:10px; font-weight:800; padding:2px 6px; border-radius:20px;}
+  .empty{text-align:center; padding:50px 20px; color:var(--muted)}
+
+  .ctx-menu{position:fixed; z-index:900; background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:6px; min-width:185px; box-shadow:0 18px 40px rgba(0,0,0,.55); animation:pop .12s ease-out;}
+  @keyframes pop{from{opacity:0; transform:scale(.95)} to{opacity:1; transform:scale(1)}}
+  .ctx-menu button{display:block; width:100%; text-align:left; padding:10px 12px; background:transparent; color:var(--txt); font-size:13.5px; border-radius:8px;}
+  .ctx-menu button:hover{background:rgba(108,140,255,.22)}
+  .ctx-menu button.danger{color:var(--danger)}
+  .ctx-menu button.danger:hover{background:rgba(255,93,108,.18)}
+  .ctx-menu .sep{height:1px; background:var(--line); margin:5px 4px}
+
+  .modal-back{position:fixed; inset:0; background:rgba(5,8,20,.7); backdrop-filter:blur(4px); z-index:1000; display:grid; place-items:center; padding:20px;}
+  .modal{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:24px; width:100%; max-width:430px; max-height:88vh; overflow:auto; box-shadow:0 30px 70px rgba(0,0,0,.6);}
+  .modal h3{margin:0 0 16px; font-size:18px}
+  .field{display:block; margin-bottom:13px}
+  .field span{display:block; font-size:13px; color:var(--muted); margin-bottom:6px}
+  .field textarea{min-height:90px; resize:vertical}
+  .modal-actions{display:flex; gap:9px; justify-content:flex-start; margin-top:18px}
+  .modal-actions .primary{flex:1}
+  .modal img,.modal video{max-width:100%; border-radius:10px; display:block; margin:auto}
+  .modal pre{background:#0d1226; padding:14px; border-radius:10px; overflow:auto; max-height:55vh; font-size:12.5px; direction:ltr; text-align:left; white-space:pre-wrap;}
+
+  .friends{display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px}
+  .friend-card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; display:flex; align-items:center; gap:12px; transition:.15s; cursor:pointer;}
+  .friend-card:hover{background:var(--card2); border-color:var(--acc); transform:translateY(-2px)}
+  .friend-card .avatar{width:42px; height:42px; font-size:18px; flex-shrink:0}
+  .friend-card .fn{font-weight:600; font-size:14px}
+  .friend-card .fc{font-size:11.5px; color:var(--muted)}
+
+  .profile-card{background:var(--card); border:1px solid var(--line); border-radius:20px; padding:30px; max-width:430px; margin:0 auto; text-align:center;}
+  #qrBox{background:#fff; padding:14px; border-radius:14px; display:inline-block; min-height:60px; min-width:60px}
+  #qrBox img,#qrBox canvas{display:block}
+  .code{font-family:monospace; font-size:21px; letter-spacing:2px; margin:18px 0 12px; background:#0d1226; padding:12px; border-radius:12px; border:1px dashed var(--line);}
+  
+  #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 10px; }
+  @media(max-width:720px){
+    .layout{flex-direction:column}
+    .sidebar{width:100%; flex-direction:row; overflow-x:auto; border-right:none; border-bottom:1px solid var(--line)}
+    .nav{white-space:nowrap}
+    .main{padding:14px}
+  }
+</style>
+</head>
+<body>
+
+<div id="authView" hidden>
+  <div class="auth-card">
+    <h1>📁 FileShare</h1>
+    <p class="sub muted">Plateforme Cloud de partage de fichiers</p>
+    <div class="tabs">
+      <button data-tab="login" class="active">Connexion</button>
+      <button data-tab="register">Nouveau compte</button>
+    </div>
+    <input id="auUsername" placeholder="Nom d'utilisateur" autocomplete="username">
+    <input id="auPassword" type="password" placeholder="Mot de passe" autocomplete="current-password">
+    <button class="primary" id="auSubmit">Se connecter</button>
+    <div class="err" id="auErr"></div>
+  </div>
+</div>
+
+<div id="appView" hidden>
+  <header class="topbar">
+    <div class="brand">📁 FileShare Cloud</div>
+    <div class="spacer"></div>
+    <div class="userchip" id="userChip"></div>
+    <button class="ghost" id="logoutBtn">Déconnexion</button>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <button class="nav active" data-view="files">🗂️ Mes fichiers</button>
+      <button class="nav" data-view="friends">👥 Amis</button>
+      <button class="nav" data-view="profile">🔗 Mon compte / QR</button>
+    </aside>
+
+    <main class="main">
+      <section id="viewFiles">
+        <div class="toolbar">
+          <button class="primary" id="btnUpload">⬆️ Téléverser</button>
+          <button class="ghost" id="btnNewFile">📄 Nouveau fichier</button>
+          <button class="ghost" id="btnNewFolder">📁 Nouveau dossier</button>
+          <button class="ghost" id="btnRefresh">🔄</button>
+          <div class="crumb" id="crumb"></div>
+        </div>
+        <div class="grid" id="fileGrid"></div>
+        <input type="file" id="fileInput" multiple hidden>
+      </section>
+
+      <section id="viewFriends" hidden>
+        <div class="toolbar">
+          <button class="primary" id="btnAddFriend">➕ Ajouter un ami</button>
+          <button class="ghost" id="btnBackFriends" hidden>← Retour</button>
+          <div class="spacer"></div>
+          <h3 id="friendName" style="margin:0" hidden></h3>
+        </div>
+        <div class="friends" id="friendsList"></div>
+        <div class="grid" id="friendGrid" hidden></div>
+      </section>
+
+      <section id="viewProfile" hidden>
+        <div class="profile-card">
+          <h2 style="margin-top:0">Scannez pour m'ajouter</h2>
+          <p class="muted">Ou donnez votre code texte à un ami</p>
+          <div id="qrBox"></div>
+          <div class="code" id="friendCode">—</div>
+          <button class="ghost" id="copyCode">📋 Copier le code</button>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="modalRoot"></div>
+
+<script>
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+/* ==================================================================
+   COUCHE API (Prête pour le Cloud)
+   Remplacez ces fonctions par des appels fetch() vers Supabase/Firebase
+================================================================== */
+const DB = {
+  getUsers: () => JSON.parse(localStorage.getItem('fs_users') || '{}'),
+  saveUsers: (u) => localStorage.setItem('fs_users', JSON.stringify(u)),
+  getFiles: () => JSON.parse(localStorage.getItem('fs_files') || '[]'),
+  saveFiles: (f) => localStorage.setItem('fs_files', JSON.stringify(f)),
+  getCurrentUser: () => localStorage.getItem('fs_currentUser'),
+  setCurrentUser: (u) => u ? localStorage.setItem('fs_currentUser', u) : localStorage.removeItem('fs_currentUser')
+};
+
+let me = null;
+let currentUser = DB.getCurrentUser();
+if (currentUser) me = DB.getUsers()[currentUser];
+
+const st = { parent: null, crumbs: [{ id: null, name: 'Mes fichiers' }], items: [] };
+let friendState = { id: null, parent: null, crumbs: [] };
+
+async function api(path, { method = 'GET', body = null } = {}) {
+  await new Promise(r => setTimeout(r, 100)); // Simulation réseau
+  const activeUser = DB.getCurrentUser();
+  const users = DB.getUsers();
+  let files = DB.getFiles();
+
+  if (path === '/api/register') {
+    if (users[body.username]) throw new Error('Ce nom d\'utilisateur existe déjà');
+    const code = 'FS-' + Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+    users[body.username] = { username: body.username, password: body.password, code: code, friends: [] };
+    DB.saveUsers(users); DB.setCurrentUser(body.username);
+    return { user: { username: body.username, code: code } };
+  }
+
+  if (path === '/api/login') {
+    if (!users[body.username] || users[body.username].password !== body.password) throw new Error('Identifiants incorrects');
+    DB.setCurrentUser(body.username);
+    return { user: users[body.username] };
+  }
+
+  if (!activeUser) throw new Error('Session expirée');
+
+  if (path === '/api/me') return { user: users[activeUser] };
+  if (path === '/api/files') return { items: files.filter(f => f.userId === activeUser && f.parent === (body && body.parent ? body.parent : null)) };
+
+  if (path === '/api/file') {
+    const fileId = Date.now().toString() + Math.random().toString(36).substring(2,5);
+    files.push({ id: fileId, userId: activeUser, parent: body.parent, name: body.name, type: 'file', size: body.content ? body.content.length : 0, content: body.content, shared: false });
+    DB.saveFiles(files); return { success: true };
+  }
+
+  if (path === '/api/folder') {
+    const folderId = Date.now().toString() + Math.random().toString(36).substring(2,5);
+    files.push({ id: folderId, userId: activeUser, parent: body.parent, name: body.name, type: 'folder', size: 0, content: null, shared: false });
+    DB.saveFiles(files); return { success: true };
+  }
+
+  if (path === '/api/rename') {
+    const f = files.find(x => x.id === body.id && x.userId === activeUser);
+    if (f) { f.name = body.name; DB.saveFiles(files); } return { success: true };
+  }
+
+  if (path === '/api/delete') {
+    const toDelete = [body.id];
+    let added = true;
+    while (added) { added = false; files.forEach(f => { if (toDelete.includes(f.parent) && !toDelete.includes(f.id)) { toDelete.push(f.id); added = true; } }); }
+    files = files.filter(f => !toDelete.includes(f.id)); DB.saveFiles(files); return { success: true };
+  }
+
+  if (path === '/api/share') {
+    function setShareRecursive(id, isShared) {
+      const f = files.find(x => x.id === id && x.userId === activeUser);
+      if (f) f.shared = isShared;
+      if (f && f.type === 'folder') files.forEach(child => { if (child.parent === id) setShareRecursive(child.id, isShared); });
+    }
+    setShareRecursive(body.id, body.shared); DB.saveFiles(files); return { success: true };
+  }
+
+  if (path === '/api/friends') {
+    const myFriends = users[activeUser].friends || [];
+    return { friends: myFriends.map(fname => ({ id: fname, username: fname, sharedCount: files.filter(f => f.userId === fname && f.shared).length })) };
+  }
+
+  if (path === '/api/friend') {
+    const friendCode = body.code.trim().toUpperCase();
+    const foundUsername = Object.keys(users).find(u => users[u].code === friendCode);
+    if (!foundUsername) throw new Error('Code introuvable');
+    if (foundUsername === activeUser) throw new Error('Vous ne pouvez pas vous ajouter');
+    if (!users[activeUser].friends) users[activeUser].friends = [];
+    if (users[activeUser].friends.includes(foundUsername)) throw new Error('Déjà ami');
+    users[activeUser].friends.push(foundUsername); DB.saveUsers(users);
+    return { friend: { username: foundUsername } };
+  }
+
+  if (path.startsWith('/api/users/') && path.endsWith('/shared')) {
+    const friendId = decodeURIComponent(path.split('/')[3]);
+    const parentId = body && body.parent ? body.parent : null;
+    return { user: { username: friendId }, items: files.filter(f => f.userId === friendId && f.parent === parentId && f.shared) };
+  }
+  throw new Error('Route inconnue');
+}
+
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function fmtSize(b) { if (!b) return ''; const u = ['O', 'Ko', 'Mo', 'Go']; let i = 0; while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; } return (i ? b.toFixed(1) : b) + ' ' + u[i]; }
+function fileIcon(name, type) {
+  if (type === 'folder') return '📁';
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  if (['png','jpg','jpeg','gif','webp'].includes(ext)) return '🖼️';
+  if (['mp4','mkv','avi','webm'].includes(ext)) return '🎬';
+  if (['mp3','wav','ogg','m4a'].includes(ext)) return '🎵';
+  if (['pdf'].includes(ext)) return '📕';
+  if (['zip','rar','7z'].includes(ext)) return '📦';
+  if (['txt','md','json','js','html','css'].includes(ext)) return '📝';
+  return '📄';
+}
+
+/* ==================================================================
+   MODALES & MENU
+================================================================== */
+const modalRoot = $('#modalRoot');
+function closeModal() { modalRoot.innerHTML = ''; }
+
+function openModal({ title, fields = [], submitText = 'Enregistrer', onSubmit, extraHTML = '' }) {
+  modalRoot.innerHTML = '';
+  const back = document.createElement('div'); back.className = 'modal-back';
+  const box = document.createElement('div'); box.className = 'modal'; box.innerHTML = `<h3>${esc(title)}</h3>`;
+  const form = document.createElement('form');
+  fields.forEach(f => {
+    const wrap = document.createElement('label'); wrap.className = 'field'; wrap.innerHTML = `<span>${esc(f.label)}</span>`;
+    const inp = document.createElement(f.type === 'textarea' ? 'textarea' : 'input');
+    inp.name = f.name; inp.value = f.value || ''; inp.placeholder = f.placeholder || ''; if (f.type && f.type !== 'textarea') inp.type = f.type;
+    wrap.appendChild(inp); form.appendChild(wrap);
+  });
+  if (extraHTML) form.insertAdjacentHTML('beforeend', extraHTML);
+  const actions = document.createElement('div'); actions.className = 'modal-actions';
+  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'ghost'; cancel.textContent = 'Annuler'; cancel.onclick = closeModal;
+  const ok = document.createElement('button'); ok.type = 'submit'; ok.className = 'primary'; ok.textContent = submitText;
+  actions.append(cancel, ok); form.appendChild(actions); box.appendChild(form); back.appendChild(box); modalRoot.appendChild(back);
+  back.addEventListener('click', e => { if (e.target === back) closeModal(); });
+  form.addEventListener('submit', async e => {
+    e.preventDefault(); const data = {};
+    fields.forEach(f => { data[f.name] = form.elements[f.name].value; });
+    try { await onSubmit(data); } catch (err) { alert(err.message); }
+  });
+  setTimeout(() => { const i = form.querySelector('input,textarea'); if (i) i.focus(); }, 60);
+}
+
+function showHTMLModal(title, html) {
+  modalRoot.innerHTML = '';
+  const back = document.createElement('div'); back.className = 'modal-back';
+  back.innerHTML = `<div class="modal"><h3>${esc(title)}</h3>${html}<div class="modal-actions"><button class="ghost">Fermer</button></div></div>`;
+  back.querySelector('button').onclick = closeModal;
+  back.addEventListener('click', e => { if (e.target === back) closeModal(); });
+  modalRoot.appendChild(back);
+}
+
+function closeMenu() { const m = $('#ctxMenu'); if (m) m.remove(); }
+function showMenu(x, y, items) {
+  closeMenu(); const m = document.createElement('div'); m.className = 'ctx-menu'; m.id = 'ctxMenu';
+  items.forEach(it => {
+    if (it.sep) { m.insertAdjacentHTML('beforeend', '<div class="sep"></div>'); return; }
+    const b = document.createElement('button'); b.textContent = it.label; if (it.danger) b.classList.add('danger');
+    b.onclick = ev => { ev.stopPropagation(); closeMenu(); it.action(); }; m.appendChild(b);
+  });
+  document.body.appendChild(m); const r = m.getBoundingClientRect();
+  m.style.left = Math.max(6, Math.min(x, innerWidth - r.width - 8)) + 'px'; m.style.top = Math.max(6, Math.min(y, innerHeight - r.height - 8)) + 'px';
+}
+document.addEventListener('click', e => { if (!e.target.closest('#ctxMenu')) closeMenu(); });
+document.addEventListener('scroll', closeMenu, true);
+
+/* ==================================================================
+   AUTH & APP INIT
+================================================================== */
+let authMode = 'login';
+$$('.tabs button').forEach(b => {
+  b.onclick = () => {
+    authMode = b.dataset.tab; $$('.tabs button').forEach(x => x.classList.toggle('active', x === b));
+    $('#auSubmit').textContent = authMode === 'login' ? 'Se connecter' : 'Créer un compte'; $('#auErr').textContent = '';
+  };
+});
+$('#auSubmit').onclick = async () => {
+  const u = $('#auUsername').value.trim(), p = $('#auPassword').value;
+  $('#auErr').textContent = '';
+  if (!u || !p) { $('#auErr').textContent = 'Remplissez tous les champs'; return; }
+  try {
+    const r = await api('/api/' + (authMode === 'login' ? 'login' : 'register'), { method: 'POST', body: { username: u, password: p } });
+    me = r.user; showApp();
+  } catch (e) { $('#auErr').textContent = e.message; }
+};
+$('#logoutBtn').onclick = () => { DB.setCurrentUser(null); currentUser = null; me = null; $('#appView').hidden = true; $('#authView').hidden = false; $('#auPassword').value = ''; };
+
+(function init() { if (currentUser && me) showApp(); else $('#authView').hidden = false; })();
+
+function showApp() {
+  $('#authView').hidden = true; $('#appView').hidden = false;
+  $('#userChip').innerHTML = `<span class="avatar">${esc((me.username[0] || '?').toUpperCase())}</span>${esc(me.username)}`;
+  st.parent = null; st.crumbs = [{ id: null, name: 'Mes fichiers' }];
+  switchView('files'); loadFiles(); loadFriends(); renderProfile();
+}
+function switchView(name) {
+  $$('.nav').forEach(n => n.classList.toggle('active', n.dataset.view === name));
+  $('#viewFiles').hidden = name !== 'files'; $('#viewFriends').hidden = name !== 'friends'; $('#viewProfile').hidden = name !== 'profile';
+  if (name === 'friends') loadFriends(); if (name === 'profile') renderProfile();
+}
+$$('.nav').forEach(n => n.onclick = () => switchView(n.dataset.view));
+
+/* ==================================================================
+   FICHIERS
+================================================================== */
+async function loadFiles() {
+  try { const r = await api('/api/files', { body: { parent: st.parent } }); st.items = r.items; renderFiles(); renderCrumb(); } catch (e) { console.error(e); }
+}
+function renderCrumb() {
+  const c = $('#crumb'); c.innerHTML = '';
+  st.crumbs.forEach((cr, i) => {
+    if (i) c.insertAdjacentHTML('beforeend', '<span>/</span>');
+    const b = document.createElement('button'); b.textContent = cr.name;
+    b.onclick = () => { st.crumbs = st.crumbs.slice(0, i + 1); st.parent = cr.id; loadFiles(); };
+    c.appendChild(b);
+  });
+}
+function renderFiles() {
+  const g = $('#fileGrid'); g.innerHTML = '';
+  if (!st.items.length) { g.innerHTML = `<div class="empty" style="grid-column:1/-1">📂 Ce dossier est vide</div>`; return; }
+  st.items.forEach(item => g.appendChild(makeCard(item, false)));
+}
+function makeCard(item, isFriend) {
+  const card = document.createElement('div'); card.className = 'file-card';
+  card.innerHTML = `${item.shared ? '<div class="badge-share">PARTAGÉ</div>' : ''}<div class="ico">${fileIcon(item.name, item.type)}</div><div class="nm">${esc(item.name)}</div><div class="sz">${item.type === 'folder' ? 'Dossier' : fmtSize(item.size)}</div>`;
+  card.onclick = e => {
+    e.stopPropagation(); if (isFriend) return friendItemMenu(e, item);
+    const menu = [{ label: '📂 Ouvrir', action: () => openItem(item) }, { label: '✏️ Renommer', action: () => renameItem(item) }, { label: '🗑️ Supprimer', danger: true, action: () => deleteItem(item) }, { sep: true }];
+    if (item.type === 'file') menu.push({ label: '⬇️ Télécharger', action: () => downloadItem(item) });
+    menu.push({ label: item.shared ? '🚫 Annuler le partage' : '🔗 Partager', action: () => toggleShare(item) });
+    showMenu(e.clientX, e.clientY, menu);
+  };
+  return card;
+}
+function openItem(item) {
+  if (item.type === 'folder') { st.crumbs.push({ id: item.id, name: item.name }); st.parent = item.id; loadFiles(); }
+  else previewItem(item);
+}
+async function previewItem(item) {
+  try {
+    if (!item.content) return alert("Fichier vide");
+    const b64 = item.content.split(',')[1] || item.content;
+    const byteCharacters = atob(b64); const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
+    const blob = new Blob([new Uint8Array(byteNumbers)], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob); const ext = (item.name.split('.').pop() || '').toLowerCase(); let html = '';
+    if (['png','jpg','jpeg','gif','webp','svg'].includes(ext)) html = `<img src="${url}">`;
+    else if (['mp4','webm'].includes(ext)) html = `<video src="${url}" controls></video>`;
+    else if (['mp3','wav','m4a'].includes(ext)) html = `<audio src="${url}" controls style="width:100%"></audio>`;
+    else if (['txt','md','json','js','css','html'].includes(ext)) html = `<pre>${esc(decodeURIComponent(escape(atob(b64))).slice(0,30000))}</pre>`;
+    else html = `<p class="muted">Aperçu indisponible. Utilisez "Télécharger".</p>`;
+    showHTMLModal(item.name, html); setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) { alert("Erreur : " + e.message); }
+}
+async function downloadItem(item) {
+  if (!item.content) return alert("Fichier vide");
+  const a = document.createElement('a'); a.href = item.content.startsWith('data:') ? item.content : 'data:application/octet-stream;base64,' + item.content;
+  a.download = item.name; document.body.appendChild(a); a.click(); a.remove();
+}
+function renameItem(item) {
+  openModal({ title: 'Renommer', fields: [{ name: 'name', label: 'Nouveau nom', value: item.name }],
+    onSubmit: async d => { const n = d.name.trim(); if (!n) throw new Error('Requis'); await api('/api/rename', { method: 'POST', body: { id: item.id, name: n } }); closeModal(); loadFiles(); } });
+}
+async function deleteItem(item) {
+  if (!confirm(`Supprimer "${item.name}" ?`)) return;
+  try { await api('/api/delete', { method: 'POST', body: { id: item.id } }); loadFiles(); } catch (e) { alert(e.message); }
+}
+async function toggleShare(item) {
+  try { await api('/api/share', { method: 'POST', body: { id: item.id, shared: !item.shared } }); loadFiles(); } catch (e) { alert(e.message); }
+}
+$('#btnUpload').onclick = () => $('#fileInput').click();
+$('#fileInput').onchange = async e => {
+  const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
+  for (const f of files) {
+    if (f.size > 4 * 1024 * 1024) { alert('Max 4MB (Demo): ' + f.name); continue; }
+    const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+    try { await api('/api/file', { method: 'POST', body: { parent: st.parent, name: f.name, content: b64 } }); } catch (err) { alert(err.message); }
+  }
+  loadFiles();
+};
+$('#btnNewFile').onclick = () => {
+  openModal({ title: 'Nouveau fichier', fields: [{ name: 'base', label: 'Nom', placeholder: 'notes' }, { name: 'ext', label: 'Extension', placeholder: 'txt' }, { name: 'content', label: 'Contenu', type: 'textarea' }],
+    onSubmit: async d => {
+      if (!d.base.trim()) throw new Error('Nom requis'); const name = d.ext.trim() ? `${d.base.trim()}.${d.ext.trim().replace(/^\./, '')}` : d.base.trim();
+      const b64 = btoa(unescape(encodeURIComponent(d.content || ''))); await api('/api/file', { method: 'POST', body: { parent: st.parent, name, content: 'data:text/plain;base64,' + b64 } });
+      closeModal(); loadFiles();
+    } });
+};
+$('#btnNewFolder').onclick = () => {
+  openModal({ title: 'Nouveau dossier', fields: [{ name: 'name', label: 'Nom' }],
+    onSubmit: async d => { if (!d.name.trim()) throw new Error('Requis'); await api('/api/folder', { method: 'POST', body: { parent: st.parent, name: d.name.trim() } }); closeModal(); loadFiles(); } });
+};
+$('#btnRefresh').onclick = () => loadFiles();
+
+/* ==================================================================
+   AMIS & CAMERA (QR SCANNER avec html5-qrcode)
+================================================================== */
+async function loadFriends() {
+  try { const r = await api('/api/friends'); renderFriends(r.friends); } catch (e) {}
+}
+function renderFriends(list) {
+  const box = $('#friendsList'); $('#btnBackFriends').hidden = true; $('#friendName').hidden = true; $('#friendGrid').hidden = true; box.hidden = false; box.innerHTML = '';
+  if (!list.length) { box.innerHTML = `<div class="empty" style="grid-column:1/-1">Aucun ami</div>`; return; }
+  list.forEach(f => {
+    const c = document.createElement('div'); c.className = 'friend-card';
+    c.innerHTML = `<div class="avatar">${esc((f.username[0] || '?').toUpperCase())}</div><div><div class="fn">${esc(f.username)}</div><div class="fc">${f.sharedCount} fichier(s) partagé(s)</div></div>`;
+    c.onclick = () => openFriend(f); box.appendChild(c);
+  });
+}
+async function openFriend(f, parentId = null, crumbName = null, isBack = false) {
+  try {
+    if (!friendState.id || friendState.id !== f.id) { friendState.id = f.id; friendState.crumbs = [{ id: null, name: 'Partagés' }]; friendState.parent = null; }
+    if (isBack) friendState.crumbs.pop(); else if (parentId) friendState.crumbs.push({ id: parentId, name: crumbName });
+    friendState.parent = friendState.crumbs[friendState.crumbs.length - 1].id;
+    const r = await api('/api/users/' + encodeURIComponent(friendState.id) + '/shared', { body: { parent: friendState.parent } });
+    $('#friendsList').hidden = true; $('#btnBackFriends').hidden = false; $('#friendName').hidden = false; $('#friendName').textContent = 'Dossier: ' + (friendState.crumbs.length > 1 ? friendState.crumbs[friendState.crumbs.length - 1].name : 'Partagés');
+    const g = $('#friendGrid'); g.hidden = false; g.innerHTML = '';
+    if (!r.items.length) g.innerHTML = `<div class="empty" style="grid-column:1/-1">Vide</div>`;
+    else r.items.forEach(item => g.appendChild(makeCard(item, true)));
+  } catch (e) { alert(e.message); }
+}
+function friendItemMenu(e, item) {
+  const menu = [];
+  if (item.type === 'folder') menu.push({ label: '📂 Ouvrir', action: () => openFriend({ id: friendState.id }, item.id, item.name) });
+  else { menu.push({ label: '👁️ Aperçu', action: () => previewItem(item) }); menu.push({ label: '⬇️ Télécharger', action: () => downloadItem(item) }); }
+  showMenu(e.clientX, e.clientY, menu);
+}
+$('#btnBackFriends').onclick = () => { if (friendState.crumbs.length > 1) openFriend({ id: friendState.id }, null, null, true); else loadFriends(); };
+
+$('#btnAddFriend').onclick = () => {
+  openModal({ title: 'Ajouter un ami', fields: [{ name: 'code', label: 'Code ami', placeholder: 'FS-XXXX-XXXX' }], submitText: 'Ajouter',
+    onSubmit: async d => { if (!d.code.trim()) throw new Error('Requis'); const r = await api('/api/friend', { method: 'POST', body: { code: d.code.trim() } }); closeModal(); alert('Ami ajouté : ' + r.friend.username); loadFriends(); },
+    extraHTML: `<button type="button" class="ghost" id="scanBtn" style="width:100%">📷 Scanner le QR code</button>` });
+  setTimeout(() => { const s = $('#scanBtn'); if (s) s.onclick = scanQR; }, 50);
+};
+
+async function scanQR() {
+  modalRoot.innerHTML = `
+    <div class="modal-back">
+      <div class="modal">
+        <h3>Scannez le QR code</h3>
+        <div id="reader"></div>
+        <div class="modal-actions"><button class="ghost" id="closeScanBtn">Annuler</button></div>
+      </div>
+    </div>`;
+  
+  const html5QrCode = new Html5Qrcode("reader");
+  $('#closeScanBtn').onclick = () => {
+    html5QrCode.stop().then(() => closeModal()).catch(() => closeModal());
+  };
+
+  try {
+    await html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      async (decodedText) => {
+        // عند قراءة الكود بنجاح
+        await html5QrCode.stop();
+        closeModal();
+        try {
+          const r = await api('/api/friend', { method: 'POST', body: { code: decodedText } });
+          alert('Ami ajouté : ' + r.friend.username);
+          loadFriends();
+        } catch (err) { alert(err.message); }
+      },
+      (errorMessage) => { /* تجاهل أخطاء القراءة المستمرة */ }
+    );
+  } catch (err) {
+    alert("Impossible d'accéder à la caméra: " + err);
+    closeModal();
+  }
+}
+
+/* ==================================================================
+   PROFIL
+================================================================== */
+function renderProfile() {
+  $('#friendCode').textContent = me.code;
+  const box = $('#qrBox'); box.innerHTML = '';
+  if (window.QRCode) {
+    new QRCode(box, { text: me.code, width: 200, height: 200, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+  } else box.innerHTML = '<span style="color:#000">QR indisponible</span>';
+}
+$('#copyCode').onclick = async () => {
+  try { await navigator.clipboard.writeText(me.code); $('#copyCode').textContent = '✅ Copié'; setTimeout(() => $('#copyCode').textContent = '📋 Copier', 1500); }
+  catch (e) { prompt('Copiez :', me.code); }
+};
+</script>
+</body>
+</html>
